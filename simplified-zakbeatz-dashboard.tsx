@@ -21,7 +21,7 @@ const ZakbeatzDashboard = () => {
 
   const [filters, setFilters] = useState({ artist: "all", type: "all", month: "all", year: "all" });
   const [form, setForm] = useState({ artist: "", note: "", date: new Date().toISOString().split("T")[0], packageType: "8h" });
-  const [newArtist, setNewArtist] = useState({ name: "", rate: 50, type: "pacote_horas" });
+  const [newArtist, setNewArtist] = useState({ name: "" });
   const [showNewForm, setShowNewForm] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
 
@@ -121,12 +121,17 @@ const ZakbeatzDashboard = () => {
   const addArtist = () => {
     if (!newArtist.name.trim()) return;
     const id = newArtist.name.toLowerCase().replace(/\s+/g, "_");
-    const artist = { ...newArtist, id, rate: Number(newArtist.rate) };
+    const artist = { 
+      ...newArtist, 
+      id, 
+      rate: 50, // Valor padrão
+      type: "pacote_horas" // Tipo padrão
+    };
     
     database.addArtist(artist);
     setArtists(database.getArtists());
     setForm(prev => ({ ...prev, artist: id }));
-    setNewArtist({ name: "", rate: 50, type: "pacote_horas" });
+    setNewArtist({ name: "" });
     setShowNewForm(false);
   };
 
@@ -187,12 +192,28 @@ const ZakbeatzDashboard = () => {
         <div className="flex justify-between items-center mb-3">
           <span className="font-semibold text-sm">{artist.name}</span>
           <div className="flex gap-2">
-            <span className={`text-xs px-2 py-1 rounded-full ${style.color}`}>
-              {style.icon} {style.name}
-            </span>
-            <span className="text-xs bg-blue-100 px-2 py-1 rounded-full text-blue-700">
-              {brl(artist.rate)}/h
-            </span>
+            <select 
+              value={artist.type} 
+              onChange={(e) => {
+                database.updateArtist(artist.id, { type: e.target.value });
+                setArtists(database.getArtists());
+              }}
+              className={`text-xs px-2 py-1 rounded-full border-0 ${style.color}`}
+            >
+              {Object.entries(CLIENT_TYPES).map(([id, type]) => (
+                <option key={id} value={id}>{type.icon} {type.name}</option>
+              ))}
+            </select>
+            <input 
+              type="number" 
+              step="0.5" 
+              value={artist.rate} 
+              onChange={(e) => {
+                database.updateArtist(artist.id, { rate: Number(e.target.value) });
+                setArtists(database.getArtists());
+              }}
+              className="text-xs bg-blue-100 px-2 py-1 rounded-full text-blue-700 border-0 w-16 text-center"
+            />
             <button 
               onClick={() => removeArtist(artist.id)}
               className="text-red-500 hover:bg-red-50 rounded px-1 text-xs"
@@ -464,42 +485,24 @@ const ZakbeatzDashboard = () => {
           {/* New Artist Form */}
           {showNewForm && (
             <div className="mt-4 p-4 bg-blue-50 rounded border-blue-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className="sm:col-span-2 lg:col-span-2">
-                  <input 
-                    type="text" 
-                    placeholder="Nome do cliente..." 
-                    value={newArtist.name} 
-                    onChange={e => setNewArtist(prev => ({ ...prev, name: e.target.value }))} 
-                    className="w-full border rounded px-3 py-2 text-sm"
-                  />
-                </div>
-                <select 
-                  value={newArtist.type} 
-                  onChange={e => setNewArtist(prev => ({ ...prev, type: e.target.value }))}
-                  className="border rounded px-3 py-2 text-sm"
-                >
-                  {Object.entries(CLIENT_TYPES).map(([id, type]) => (
-                    <option key={id} value={id}>{type.icon} {type.name}</option>
-                  ))}
-                </select>
+              <div className="flex gap-2">
                 <input 
-                  type="number" 
-                  step="0.5" 
-                  placeholder="Valor/hora" 
-                  value={newArtist.rate} 
-                  onChange={e => setNewArtist(prev => ({ ...prev, rate: e.target.value }))} 
-                  className="border rounded px-3 py-2 text-sm"
+                  type="text" 
+                  placeholder="Nome do cliente..." 
+                  value={newArtist.name} 
+                  onChange={e => setNewArtist(prev => ({ ...prev, name: e.target.value }))} 
+                  className="flex-1 border rounded px-3 py-2 text-sm"
                 />
-                <div className="flex gap-2">
-                  <button onClick={addArtist} className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
-                    Salvar
-                  </button>
-                  <button onClick={() => setShowNewForm(false)} className="flex-1 px-3 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400">
-                    Cancelar
-                  </button>
-                </div>
+                <button onClick={addArtist} className="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+                  Salvar
+                </button>
+                <button onClick={() => setShowNewForm(false)} className="px-4 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400">
+                  Cancelar
+                </button>
               </div>
+              <p className="text-xs text-gray-600 mt-2">
+                💡 Tipo e valor por hora serão configurados depois
+              </p>
             </div>
           )}
         </div>

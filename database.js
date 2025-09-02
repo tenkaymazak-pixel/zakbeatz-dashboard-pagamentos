@@ -47,8 +47,8 @@ class Database {
       CREATE TABLE IF NOT EXISTS artists (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        rate REAL NOT NULL,
-        type TEXT NOT NULL
+        rate REAL DEFAULT 50,
+        type TEXT DEFAULT 'pacote_horas'
       )
     `);
 
@@ -142,7 +142,7 @@ class Database {
   addArtist(artist) {
     this.db.run(
       'INSERT INTO artists (id, name, rate, type) VALUES (?, ?, ?, ?)',
-      [artist.id, artist.name, artist.rate, artist.type]
+      [artist.id, artist.name, artist.rate || 50, artist.type || 'pacote_horas']
     );
     this.save();
   }
