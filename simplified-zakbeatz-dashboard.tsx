@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import database from "./database.js";
 
 const CLIENT_TYPES = {
   producao_semanal: { color: "bg-green-100 text-green-800", icon: "📅", name: "Prod. Semanal" },
@@ -14,32 +15,40 @@ const CLIENT_TYPES = {
 const PACKAGE_VALUES = { "4h": 200, "8h": 400, "12h": 600, "16h": 800, "20h": 1000 };
 
 const ZakbeatzDashboard = () => {
-  const [artists, setArtists] = useState([
-    { id: "vic", name: "Vic Wendler", rate: 37.5, type: "producao_semanal" },
-    { id: "felipe", name: "Felipe Kaziran", rate: 50, type: "mixagem" },
-    { id: "wild", name: "Wild", rate: 50, type: "pacote_horas" },
-    { id: "marina", name: "Marina Santos", rate: 45, type: "producao_quinzenal" },
-    { id: "carlos", name: "Carlos Beat", rate: 60, type: "masterizacao" },
-    { id: "julia", name: "Júlia Vocal", rate: 55, type: "gravacao" },
-    { id: "rafael", name: "Rafael Show", rate: 75, type: "montagem_show" },
-    { id: "bruno", name: "Bruno Beats", rate: 40, type: "venda_beat" },
-  ]);
-
-  const [sessions, setSessions] = useState([
-    { id: 1, date: "2025-08-01", artistId: "vic", start: "09:00", pauseStart: "", pauseEnd: "", end: "13:00", totalHours: 4, note: "Produção", paidAmount: 0 },
-    { id: 2, date: "2025-08-02", artistId: "felipe", start: "14:00", pauseStart: "16:00", pauseEnd: "16:30", end: "18:00", totalHours: 3.5, note: "Mixagem", paidAmount: 200 },
-    { id: 3, date: "2025-08-03", artistId: "marina", start: "10:00", pauseStart: "", pauseEnd: "", end: "14:00", totalHours: 4, note: "Produção Quinzenal", paidAmount: 100 },
-    { id: 4, date: "2025-08-04", artistId: "carlos", start: "15:00", pauseStart: "", pauseEnd: "", end: "17:00", totalHours: 2, note: "Masterização EP", paidAmount: 0 },
-    { id: 5, date: "2025-08-05", artistId: "julia", start: "11:00", pauseStart: "13:00", pauseEnd: "14:00", end: "15:00", totalHours: 3, note: "Gravação Vocal", paidAmount: 220 },
-    { id: 6, date: "2025-08-06", artistId: "rafael", start: "16:00", pauseStart: "", pauseEnd: "", end: "20:00", totalHours: 4, note: "Montagem Show", paidAmount: 150 },
-    { id: 7, date: "2025-08-07", artistId: "bruno", start: "13:00", pauseStart: "", pauseEnd: "", end: "16:00", totalHours: 3, note: "Criação Beats", paidAmount: 0 },
-    { id: 8, date: "2025-08-08", artistId: "wild", packageType: "8h", totalHours: 8, note: "Pacote 8h", paidAmount: 400, isPackage: true },
-  ]);
+  const [artists, setArtists] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [filters, setFilters] = useState({ artist: "all", type: "all", month: "all", year: "all" });
-  const [form, setForm] = useState({ artist: "felipe", note: "", date: new Date().toISOString().split("T")[0], packageType: "8h" });
+  const [form, setForm] = useState({ artist: "", note: "", date: new Date().toISOString().split("T")[0], packageType: "8h" });
   const [newArtist, setNewArtist] = useState({ name: "", rate: 50, type: "pacote_horas" });
   const [showNewForm, setShowNewForm] = useState(false);
+
+  // Carregar dados do banco
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        await database.init();
+        const artistsData = database.getArtists();
+        const sessionsData = database.getSessions();
+        
+        setArtists(artistsData);
+        setSessions(sessionsData);
+        
+        // Definir primeiro artista como padrão no formulário
+        if (artistsData.length > 0) {
+          setForm(prev => ({ ...prev, artist: artistsData[0].id }));
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   // Utility functions
   const getArtist = (id) => artists.find(a => a.id === id);
@@ -75,59 +84,79 @@ const ZakbeatzDashboard = () => {
 
   // Event handlers
   const addSession = () => {
-    const newId = Math.max(...sessions.map(s => s.id), 0) + 1;
     const artist = getArtist(form.artist);
     
     const newSession = artist?.type === "pacote_horas" ? {
-      id: newId, date: form.date, artistId: form.artist, note: form.note,
+      date: form.date, artistId: form.artist, note: form.note,
       packageType: form.packageType, totalHours: parseInt(form.packageType),
       paidAmount: PACKAGE_VALUES[form.packageType], isPackage: true
     } : {
-      id: newId, date: form.date, artistId: form.artist,
+      date: form.date, artistId: form.artist,
       start: "", pauseStart: "", pauseEnd: "", end: "", totalHours: 0, note: form.note, paidAmount: 0
     };
     
-    setSessions(prev => [...prev, newSession]);
+    database.addSession(newSession);
+    setSessions(database.getSessions());
     setForm(prev => ({ ...prev, note: "" }));
   };
 
   const addArtist = () => {
     if (!newArtist.name.trim()) return;
     const id = newArtist.name.toLowerCase().replace(/\s+/g, "_");
-    setArtists(prev => [...prev, { ...newArtist, id, rate: Number(newArtist.rate) }]);
+    const artist = { ...newArtist, id, rate: Number(newArtist.rate) };
+    
+    database.addArtist(artist);
+    setArtists(database.getArtists());
     setForm(prev => ({ ...prev, artist: id }));
     setNewArtist({ name: "", rate: 50, type: "pacote_horas" });
     setShowNewForm(false);
   };
 
   const updateTime = (id, field, value) => {
-    setSessions(prev => prev.map(s => {
-      if (s.id !== id) return s;
-      const updated = { ...s, [field]: value };
+    const session = sessions.find(s => s.id === id);
+    if (!session) return;
+    
+    const updated = { ...session, [field]: value };
+    
+    if (updated.start && updated.end) {
+      let totalMinutes = timeToMinutes(updated.end) - timeToMinutes(updated.start);
       
-      if (updated.start && updated.end) {
-        let totalMinutes = timeToMinutes(updated.end) - timeToMinutes(updated.start);
-        
-        if (updated.pauseStart && updated.pauseEnd) {
-          const pauseMinutes = timeToMinutes(updated.pauseEnd) - timeToMinutes(updated.pauseStart);
-          totalMinutes -= pauseMinutes;
-        }
-        
-        updated.totalHours = Math.max(0, totalMinutes / 60);
+      if (updated.pauseStart && updated.pauseEnd) {
+        const pauseMinutes = timeToMinutes(updated.pauseEnd) - timeToMinutes(updated.pauseStart);
+        totalMinutes -= pauseMinutes;
       }
-      return updated;
-    }));
+      
+      updated.totalHours = Math.max(0, totalMinutes / 60);
+    }
+    
+    database.updateSession(id, updated);
+    setSessions(database.getSessions());
   };
 
   const updatePaid = (artistId, value) => {
     const amount = parseFloat(value.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
-    setSessions(prev => prev.map(s => 
-      s.artistId === artistId ? { ...s, paidAmount: amount } : s
-    ));
+    
+    // Atualizar todas as sessões do artista
+    sessions.forEach(session => {
+      if (session.artistId === artistId) {
+        database.updateSession(session.id, { paidAmount: amount });
+      }
+    });
+    
+    setSessions(database.getSessions());
   };
 
   const removeSession = (id) => {
-    setSessions(prev => prev.filter(s => s.id !== id));
+    database.deleteSession(id);
+    setSessions(database.getSessions());
+  };
+
+  const removeArtist = (id) => {
+    if (window.confirm('Tem certeza que deseja remover este artista? Todas as sessões relacionadas também serão removidas.')) {
+      database.deleteArtist(id);
+      setArtists(database.getArtists());
+      setSessions(database.getSessions());
+    }
   };
 
   const ClientCard = ({ artist, hours, paid }) => {
@@ -146,6 +175,13 @@ const ZakbeatzDashboard = () => {
             <span className="text-xs bg-blue-100 px-2 py-1 rounded-full text-blue-700">
               {brl(artist.rate)}/h
             </span>
+            <button 
+              onClick={() => removeArtist(artist.id)}
+              className="text-red-500 hover:bg-red-50 rounded px-1 text-xs"
+              title="Remover artista"
+            >
+              ✕
+            </button>
           </div>
         </div>
         
@@ -182,6 +218,17 @@ const ZakbeatzDashboard = () => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando banco de dados...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white flex">
       {/* Sidebar */}
@@ -189,6 +236,49 @@ const ZakbeatzDashboard = () => {
         <div className="mb-6">
           <h1 className="text-2xl font-bold mb-1">ZAKBEATZ OS</h1>
           <p className="text-sm text-gray-600">Sessions • Artistas • Pagamentos</p>
+          
+          {/* Botões de banco de dados */}
+          <div className="mt-4 space-y-2">
+            <button 
+              onClick={() => database.exportDatabase()}
+              className="w-full px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+            >
+              💾 Exportar Banco
+            </button>
+            <label className="w-full px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600 cursor-pointer block text-center">
+              📁 Importar Banco
+              <input 
+                type="file" 
+                accept=".sqlite,.db"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    database.importDatabase(file).then(() => {
+                      setArtists(database.getArtists());
+                      setSessions(database.getSessions());
+                      alert('Banco importado com sucesso!');
+                    }).catch(err => {
+                      alert('Erro ao importar banco: ' + err.message);
+                    });
+                  }
+                }}
+                className="hidden"
+              />
+            </label>
+            <button 
+              onClick={() => {
+                if (window.confirm('Tem certeza que deseja limpar todos os dados? Esta ação não pode ser desfeita.')) {
+                  database.clearDatabase();
+                  setArtists([]);
+                  setSessions([]);
+                  alert('Banco limpo com sucesso!');
+                }
+              }}
+              className="w-full px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+            >
+              🗑️ Limpar Banco
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
