@@ -558,7 +558,7 @@ const ZakbeatzDashboard = () => {
                             type="time" 
                             value={session.start || ""} 
                             onChange={e => updateTime(session.id, "start", e.target.value)} 
-                            className="border rounded px-2 py-1 text-xs w-16"
+                            className="border rounded px-2 py-1 text-sm w-25"
                           />
                         )}
                       </td>
@@ -569,7 +569,7 @@ const ZakbeatzDashboard = () => {
                             type="time" 
                             value={session.pauseStart || ""} 
                             onChange={e => updateTime(session.id, "pauseStart", e.target.value)} 
-                            className="border rounded px-2 py-1 text-xs w-16"
+                            className="border rounded px-2 py-1 text-sm w-25"
                           />
                         )}
                       </td>
@@ -580,7 +580,7 @@ const ZakbeatzDashboard = () => {
                             type="time" 
                             value={session.pauseEnd || ""} 
                             onChange={e => updateTime(session.id, "pauseEnd", e.target.value)} 
-                            className="border rounded px-2 py-1 text-xs w-16"
+                            className="border rounded px-2 py-1 text-sm w-25"
                           />
                         )}
                       </td>
@@ -591,7 +591,7 @@ const ZakbeatzDashboard = () => {
                             type="time" 
                             value={session.end || ""} 
                             onChange={e => updateTime(session.id, "end", e.target.value)} 
-                            className="border rounded px-2 py-1 text-xs w-16"
+                            className="border rounded px-2 py-1 text-sm w-25"
                           />
                         )}
                       </td>
