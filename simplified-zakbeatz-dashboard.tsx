@@ -23,6 +23,7 @@ const ZakbeatzDashboard = () => {
   const [form, setForm] = useState({ artist: "", note: "", date: new Date().toISOString().split("T")[0], packageType: "8h" });
   const [newArtist, setNewArtist] = useState({ name: "", rate: 50, type: "pacote_horas" });
   const [showNewForm, setShowNewForm] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   // Carregar dados do banco
   useEffect(() => {
@@ -49,6 +50,23 @@ const ZakbeatzDashboard = () => {
 
     loadData();
   }, []);
+
+  // Fechar sidebar quando clicar fora (mobile)
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showSidebar && window.innerWidth < 1024) {
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar && !sidebar.contains(event.target)) {
+          setShowSidebar(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSidebar]);
 
   // Utility functions
   const getArtist = (id) => artists.find(a => a.id === id);
@@ -230,12 +248,33 @@ const ZakbeatzDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white flex">
+    <div className="min-h-screen bg-white flex flex-col lg:flex-row">
+      {/* Mobile Header */}
+      <div className="lg:hidden bg-gray-50 border-b p-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold">ZAKBEATZ OS</h1>
+        <button 
+          onClick={() => setShowSidebar(!showSidebar)}
+          className="p-2 bg-blue-500 text-white rounded"
+        >
+          ☰
+        </button>
+      </div>
+
       {/* Sidebar */}
-      <div className="w-80 bg-gray-50 border-r p-6">
+      <div className={`sidebar ${showSidebar ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-80 bg-gray-50 border-r p-4 lg:p-6 transition-transform duration-300 ease-in-out lg:block`}>
         <div className="mb-6">
-          <h1 className="text-2xl font-bold mb-1">ZAKBEATZ OS</h1>
-          <p className="text-sm text-gray-600">Sessions • Artistas • Pagamentos</p>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h1 className="text-2xl font-bold mb-1">ZAKBEATZ OS</h1>
+              <p className="text-sm text-gray-600">Sessions • Artistas • Pagamentos</p>
+            </div>
+            <button 
+              onClick={() => setShowSidebar(false)}
+              className="lg:hidden p-2 text-gray-500 hover:bg-gray-200 rounded"
+            >
+              ✕
+            </button>
+          </div>
           
           {/* Botões de banco de dados */}
           <div className="mt-4 space-y-2">
@@ -282,7 +321,7 @@ const ZakbeatzDashboard = () => {
         </div>
 
         {/* Filters */}
-        <div className="space-y-4 mb-6">
+        <div className="space-y-3 mb-6">
           <select 
             value={filters.artist} 
             onChange={e => setFilters(prev => ({ ...prev, artist: e.target.value }))}
@@ -342,7 +381,7 @@ const ZakbeatzDashboard = () => {
           <h3 className="text-sm font-semibold mb-4 text-center bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 rounded">
             Controle por Cliente
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-96 overflow-y-auto">
             {visibleArtists.map(artist => (
               <ClientCard
                 key={artist.id}
@@ -355,15 +394,23 @@ const ZakbeatzDashboard = () => {
         </div>
       </div>
 
+      {/* Overlay para mobile */}
+      {showSidebar && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Form */}
-        <div className="p-6 border-b bg-white">
-          <h2 className="text-xl font-semibold mb-4">Adicionar Session</h2>
+        <div className="p-4 lg:p-6 border-b bg-white">
+          <h2 className="text-lg lg:text-xl font-semibold mb-4">Adicionar Session</h2>
           
-          <div className="grid grid-cols-5 gap-4 items-end">
-            <div className="col-span-2">
-              <div className="flex gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+            <div className="sm:col-span-2 lg:col-span-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <select 
                   value={form.artist} 
                   onChange={e => setForm(prev => ({ ...prev, artist: e.target.value }))} 
@@ -373,7 +420,7 @@ const ZakbeatzDashboard = () => {
                 </select>
                 <button 
                   onClick={() => setShowNewForm(!showNewForm)} 
-                  className="px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                  className="px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600 whitespace-nowrap"
                 >
                   + Cliente
                 </button>
@@ -417,8 +464,8 @@ const ZakbeatzDashboard = () => {
           {/* New Artist Form */}
           {showNewForm && (
             <div className="mt-4 p-4 bg-blue-50 rounded border-blue-200">
-              <div className="grid grid-cols-5 gap-4">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="sm:col-span-2 lg:col-span-2">
                   <input 
                     type="text" 
                     placeholder="Nome do cliente..." 
@@ -458,13 +505,14 @@ const ZakbeatzDashboard = () => {
         </div>
 
         {/* Sessions Table */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-4 lg:p-6">
           <div className="flex justify-between mb-4">
-            <h2 className="text-xl font-semibold">Histórico ({filteredSessions.length})</h2>
+            <h2 className="text-lg lg:text-xl font-semibold">Histórico ({filteredSessions.length})</h2>
           </div>
           
           <div className="bg-white border rounded-lg overflow-auto">
-            <table className="w-full">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px]">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
@@ -574,7 +622,8 @@ const ZakbeatzDashboard = () => {
                   );
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       </div>
