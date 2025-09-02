@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Limpar Banco de Dados</title>
+</head>
+<body>
+    <h1>Limpeza do Banco de Dados</h1>
+    <button onclick="clearDatabase()">Limpar Banco de Dados</button>
+    <div id="result"></div>
+
+    <script>
+        function clearDatabase() {
+            try {
+                // Limpar localStorage
+                localStorage.removeItem('zakbeatz_db');
+                console.log('localStorage limpo!');
+                
+                // Mostrar resultado
+                document.getElementById('result').innerHTML = 
+                    '<p style="color: green;">✅ Banco de dados limpo com sucesso!</p>' +
+                    '<p>Recarregue a página principal para reinicializar.</p>';
+                
+                // Redirecionar após 2 segundos
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Erro ao limpar:', error);
+                document.getElementById('result').innerHTML = 
+                    '<p style="color: red;">❌ Erro ao limpar: ' + error.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -20,7 +20,7 @@ const ZakbeatzDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   const [filters, setFilters] = useState({ artist: "all", type: "all", month: "all", year: "all" });
-  const [form, setForm] = useState({ artist: "", note: "", date: new Date().toISOString().split("T")[0], packageType: "8h" });
+  const [form, setForm] = useState({ artist: "", type: "pacote_horas", note: "", date: new Date().toISOString().split("T")[0], packageType: "8h" });
   const [newArtist, setNewArtist] = useState({ name: "" });
   const [showNewForm, setShowNewForm] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -76,12 +76,11 @@ const ZakbeatzDashboard = () => {
 
   // Filtered data
   const filteredSessions = sessions.filter(s => {
-    const artist = getArtist(s.artistId);
     const sessionMonth = new Date(s.date).getMonth() + 1;
     const sessionYear = new Date(s.date).getFullYear();
     
     return (filters.artist === "all" || s.artistId === filters.artist) &&
-           (filters.type === "all" || artist?.type === filters.type) &&
+           (filters.type === "all" || s.type === filters.type) &&
            (filters.year === "all" || filters.year === sessionYear.toString()) &&
            (filters.month === "all" || filters.month === sessionMonth.toString().padStart(2, '0'));
   });
@@ -95,21 +94,20 @@ const ZakbeatzDashboard = () => {
 
   const visibleArtists = artists.filter(artist => {
     const data = hoursByArtist[artist.id];
-    const matchesFilters = (filters.artist === "all" || artist.id === filters.artist) &&
-                          (filters.type === "all" || artist.type === filters.type);
+    const hasSessionsOfType = filters.type === "all" || 
+      filteredSessions.some(s => s.artistId === artist.id);
+    const matchesFilters = (filters.artist === "all" || artist.id === filters.artist) && hasSessionsOfType;
     return data && data.hours * artist.rate > 0 && matchesFilters;
   });
 
   // Event handlers
   const addSession = () => {
-    const artist = getArtist(form.artist);
-    
-    const newSession = artist?.type === "pacote_horas" ? {
-      date: form.date, artistId: form.artist, note: form.note,
+    const newSession = form.type === "pacote_horas" ? {
+      date: form.date, artistId: form.artist, type: form.type, note: form.note,
       packageType: form.packageType, totalHours: parseInt(form.packageType),
       paidAmount: PACKAGE_VALUES[form.packageType], isPackage: true
     } : {
-      date: form.date, artistId: form.artist,
+      date: form.date, artistId: form.artist, type: form.type,
       start: "", pauseStart: "", pauseEnd: "", end: "", totalHours: 0, note: form.note, paidAmount: 0
     };
     
@@ -192,18 +190,6 @@ const ZakbeatzDashboard = () => {
         <div className="flex justify-between items-center mb-3">
           <span className="font-semibold text-sm">{artist.name}</span>
           <div className="flex gap-2">
-            <select 
-              value={artist.type} 
-              onChange={(e) => {
-                database.updateArtist(artist.id, { type: e.target.value });
-                setArtists(database.getArtists());
-              }}
-              className={`text-xs px-2 py-1 rounded-full border-0 ${style.color}`}
-            >
-              {Object.entries(CLIENT_TYPES).map(([id, type]) => (
-                <option key={id} value={id}>{type.icon} {type.name}</option>
-              ))}
-            </select>
             <input 
               type="number" 
               step="0.5" 
@@ -213,6 +199,7 @@ const ZakbeatzDashboard = () => {
                 setArtists(database.getArtists());
               }}
               className="text-xs bg-blue-100 px-2 py-1 rounded-full text-blue-700 border-0 w-16 text-center"
+              title="Valor por hora"
             />
             <button 
               onClick={() => removeArtist(artist.id)}
@@ -455,7 +442,17 @@ const ZakbeatzDashboard = () => {
               className="border rounded px-3 py-2 text-sm"
             />
 
-            {getArtist(form.artist)?.type === "pacote_horas" ? (
+            <select 
+              value={form.type} 
+              onChange={e => setForm(prev => ({ ...prev, type: e.target.value }))}
+              className="border rounded px-3 py-2 text-sm"
+            >
+              {Object.entries(CLIENT_TYPES).map(([id, type]) => (
+                <option key={id} value={id}>{type.icon} {type.name}</option>
+              ))}
+            </select>
+
+            {form.type === "pacote_horas" ? (
               <select 
                 value={form.packageType} 
                 onChange={e => setForm(prev => ({ ...prev, packageType: e.target.value }))}
@@ -533,8 +530,8 @@ const ZakbeatzDashboard = () => {
               <tbody className="divide-y">
                 {filteredSessions.map(session => {
                   const artist = getArtist(session.artistId);
-                  const style = CLIENT_TYPES[artist?.type];
-                  const isPackage = artist?.type === "pacote_horas";
+                  const style = CLIENT_TYPES[session.type];
+                  const isPackage = session.type === "pacote_horas";
                   
                   return (
                     <tr key={session.id} className="hover:bg-gray-50">

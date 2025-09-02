@@ -70,6 +70,36 @@ class Database {
         FOREIGN KEY (artistId) REFERENCES artists (id)
       )
     `);
+
+    // Migração: adicionar coluna type se não existir
+    this.migrateAddTypeColumn();
+  }
+
+  migrateAddTypeColumn() {
+    try {
+      // Verificar se a coluna type já existe
+      const result = this.db.exec("PRAGMA table_info(sessions)");
+      const columns = result[0]?.values || [];
+      const hasTypeColumn = columns.some(col => col[1] === 'type');
+      
+      console.log('Colunas da tabela sessions:', columns.map(col => col[1]));
+      
+      if (!hasTypeColumn) {
+        console.log('Adicionando coluna type à tabela sessions...');
+        this.db.exec("ALTER TABLE sessions ADD COLUMN type TEXT DEFAULT 'pacote_horas'");
+        this.save();
+        console.log('Coluna type adicionada com sucesso!');
+        
+        // Atualizar sessões existentes com tipo padrão
+        this.db.exec("UPDATE sessions SET type = 'pacote_horas' WHERE type IS NULL");
+        this.save();
+        console.log('Sessões existentes atualizadas com tipo padrão!');
+      } else {
+        console.log('Coluna type já existe na tabela sessions');
+      }
+    } catch (error) {
+      console.error('Erro na migração:', error);
+    }
   }
 
   insertInitialData() {
@@ -94,24 +124,25 @@ class Database {
 
     // Inserir sessões iniciais
     const sessions = [
-      { date: "2025-08-01", artistId: "vic", start: "09:00", pauseStart: "", pauseEnd: "", end: "13:00", totalHours: 4, note: "Produção", paidAmount: 0 },
-      { date: "2025-08-02", artistId: "felipe", start: "14:00", pauseStart: "16:00", pauseEnd: "16:30", end: "18:00", totalHours: 3.5, note: "Mixagem", paidAmount: 200 },
-      { date: "2025-08-03", artistId: "marina", start: "10:00", pauseStart: "", pauseEnd: "", end: "14:00", totalHours: 4, note: "Produção Quinzenal", paidAmount: 100 },
-      { date: "2025-08-04", artistId: "carlos", start: "15:00", pauseStart: "", pauseEnd: "", end: "17:00", totalHours: 2, note: "Masterização EP", paidAmount: 0 },
-      { date: "2025-08-05", artistId: "julia", start: "11:00", pauseStart: "13:00", pauseEnd: "14:00", end: "15:00", totalHours: 3, note: "Gravação Vocal", paidAmount: 220 },
-      { date: "2025-08-06", artistId: "rafael", start: "16:00", pauseStart: "", pauseEnd: "", end: "20:00", totalHours: 4, note: "Montagem Show", paidAmount: 150 },
-      { date: "2025-08-07", artistId: "bruno", start: "13:00", pauseStart: "", pauseEnd: "", end: "16:00", totalHours: 3, note: "Criação Beats", paidAmount: 0 },
-      { date: "2025-08-08", artistId: "wild", packageType: "8h", totalHours: 8, note: "Pacote 8h", paidAmount: 400, isPackage: 1 }
+      { date: "2025-08-01", artistId: "vic", type: "producao_semanal", start: "09:00", pauseStart: "", pauseEnd: "", end: "13:00", totalHours: 4, note: "Produção", paidAmount: 0 },
+      { date: "2025-08-02", artistId: "felipe", type: "mixagem", start: "14:00", pauseStart: "16:00", pauseEnd: "16:30", end: "18:00", totalHours: 3.5, note: "Mixagem", paidAmount: 200 },
+      { date: "2025-08-03", artistId: "marina", type: "producao_quinzenal", start: "10:00", pauseStart: "", pauseEnd: "", end: "14:00", totalHours: 4, note: "Produção Quinzenal", paidAmount: 100 },
+      { date: "2025-08-04", artistId: "carlos", type: "masterizacao", start: "15:00", pauseStart: "", pauseEnd: "", end: "17:00", totalHours: 2, note: "Masterização EP", paidAmount: 0 },
+      { date: "2025-08-05", artistId: "julia", type: "gravacao", start: "11:00", pauseStart: "13:00", pauseEnd: "14:00", end: "15:00", totalHours: 3, note: "Gravação Vocal", paidAmount: 220 },
+      { date: "2025-08-06", artistId: "rafael", type: "montagem_show", start: "16:00", pauseStart: "", pauseEnd: "", end: "20:00", totalHours: 4, note: "Montagem Show", paidAmount: 150 },
+      { date: "2025-08-07", artistId: "bruno", type: "venda_beat", start: "13:00", pauseStart: "", pauseEnd: "", end: "16:00", totalHours: 3, note: "Criação Beats", paidAmount: 0 },
+      { date: "2025-08-08", artistId: "wild", type: "pacote_horas", packageType: "8h", totalHours: 8, note: "Pacote 8h", paidAmount: 400, isPackage: 1 }
     ];
 
     sessions.forEach(session => {
       this.db.run(
         `INSERT OR IGNORE INTO sessions 
-         (date, artistId, start, pauseStart, pauseEnd, end, totalHours, note, paidAmount, packageType, isPackage) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (date, artistId, type, start, pauseStart, pauseEnd, end, totalHours, note, paidAmount, packageType, isPackage) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           session.date, 
           session.artistId, 
+          session.type || 'pacote_horas',
           session.start || null, 
           session.pauseStart || null, 
           session.pauseEnd || null, 
@@ -141,7 +172,7 @@ class Database {
 
   addArtist(artist) {
     this.db.run(
-      'INSERT INTO artists (id, name, rate, type) VALUES (?, ?, ?, ?)',
+      'INSERT OR IGNORE INTO artists (id, name, rate, type) VALUES (?, ?, ?, ?)',
       [artist.id, artist.name, artist.rate || 50, artist.type || 'pacote_horas']
     );
     this.save();
@@ -177,13 +208,28 @@ class Database {
   }
 
   addSession(session) {
+    // Verificar se a coluna type existe antes de inserir
+    try {
+      const result = this.db.exec("PRAGMA table_info(sessions)");
+      const columns = result[0]?.values || [];
+      const hasTypeColumn = columns.some(col => col[1] === 'type');
+      
+      if (!hasTypeColumn) {
+        console.log('Coluna type não encontrada, executando migração...');
+        this.migrateAddTypeColumn();
+      }
+    } catch (error) {
+      console.error('Erro ao verificar colunas:', error);
+    }
+
     this.db.run(
       `INSERT INTO sessions 
-       (date, artistId, start, pauseStart, pauseEnd, end, totalHours, note, paidAmount, packageType, isPackage) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (date, artistId, type, start, pauseStart, pauseEnd, end, totalHours, note, paidAmount, packageType, isPackage) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         session.date, 
         session.artistId, 
+        session.type || 'pacote_horas',
         session.start || null, 
         session.pauseStart || null,
         session.pauseEnd || null, 
