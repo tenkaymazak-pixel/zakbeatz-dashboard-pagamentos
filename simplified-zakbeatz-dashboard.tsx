@@ -384,7 +384,7 @@ const ZakbeatzDashboard = () => {
       </div>
 
       {/* Sidebar */}
-      <div className={`sidebar ${showSidebar ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-80 bg-gray-50 border-r p-4 lg:p-6 transition-transform duration-300 ease-in-out lg:block`}>
+      <div className={`sidebar ${showSidebar ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-80 bg-gray-50 border-r p-4 lg:p-6 transition-transform duration-300 ease-in-out lg:block overflow-y-auto`}>
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div>
@@ -528,7 +528,7 @@ const ZakbeatzDashboard = () => {
           <h3 className="text-sm font-semibold mb-4 text-center bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 rounded">
             Controle por Cliente
           </h3>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div className="space-y-3 max-h-64 lg:max-h-96 overflow-y-auto">
             {visibleArtists.map(artist => (
               <ClientCard
                 key={artist.id}
@@ -685,7 +685,7 @@ const ZakbeatzDashboard = () => {
           {/* New Artist Form */}
           {showNewForm && (
             <div className="mt-4 p-4 bg-blue-50 rounded border-blue-200">
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input 
                   type="text" 
                   placeholder="Nome do cliente..." 
@@ -693,12 +693,14 @@ const ZakbeatzDashboard = () => {
                   onChange={e => setNewArtist(prev => ({ ...prev, name: e.target.value }))} 
                   className="flex-1 border rounded px-3 py-2 text-sm"
                 />
-                <button onClick={addArtist} className="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
-                  Salvar
-                </button>
-                <button onClick={() => setShowNewForm(false)} className="px-4 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400">
-                  Cancelar
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={addArtist} className="flex-1 px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+                    Salvar
+                  </button>
+                  <button onClick={() => setShowNewForm(false)} className="flex-1 px-4 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400">
+                    Cancelar
+                  </button>
+                </div>
               </div>
               <p className="text-xs text-gray-600 mt-2">
                 💡 Tipo e valor por hora serão configurados depois
@@ -715,12 +717,12 @@ const ZakbeatzDashboard = () => {
           
           <div className="bg-white border rounded-lg overflow-auto">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px]">
+              <table className="w-full min-w-[900px]">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Artista</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase min-w-0">Tipo</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início/Qtd</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pausa</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reinício</th>
@@ -743,8 +745,8 @@ const ZakbeatzDashboard = () => {
                         {artist?.name} <span className="text-xs">{style?.icon}</span>
                       </td>
                       
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-1 rounded-full ${style?.color}`}>
+                      <td className="px-4 py-3 min-w-0">
+                        <span className={`text-xs px-2 py-1 rounded-full ${style?.color} whitespace-nowrap`}>
                           {style?.icon} {style?.name}
                         </span>
                       </td>
@@ -839,8 +841,8 @@ const ZakbeatzDashboard = () => {
       
       {/* Modal de Lançar Pagamento */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-sm">
             <h3 className="text-lg font-bold mb-4">
               Lançar Pagamento - {selectedArtist?.name}
             </h3>
@@ -857,7 +859,7 @@ const ZakbeatzDashboard = () => {
                 placeholder="0,00"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={() => {
                   if (paymentAmount && parseFloat(paymentAmount) > 0) {
@@ -888,8 +890,8 @@ const ZakbeatzDashboard = () => {
       
       {/* Modal de Histórico de Pagamentos */}
       {showPaymentHistoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 max-h-96 overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-sm max-h-96 overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">
               Histórico de Pagamentos - {selectedArtist?.name}
             </h3>
