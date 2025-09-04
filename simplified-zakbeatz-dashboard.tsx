@@ -4,7 +4,8 @@ import database from "./database.js";
 const CLIENT_TYPES = {
   producao_semanal: { color: "bg-green-100 text-green-800", icon: "📅", name: "Prod. Semanal" },
   producao_quinzenal: { color: "bg-blue-100 text-blue-800", icon: "🗓️", name: "Prod. Quinzenal" },
-  pacote_horas: { color: "bg-purple-100 text-purple-800", icon: "⏰", name: "Pacote Horas" },
+  parceria_contrapartida: { color: "bg-teal-100 text-teal-800", icon: "🤝", name: "Parceria/Contrapartida" },
+  producao_musical: { color: "bg-purple-100 text-purple-800", icon: "🎵", name: "Produção Musical" },
   mixagem: { color: "bg-orange-100 text-orange-800", icon: "🎛️", name: "Mixagem" },
   masterizacao: { color: "bg-red-100 text-red-800", icon: "🎚️", name: "Masterização" },
   gravacao: { color: "bg-yellow-100 text-yellow-800", icon: "🎤", name: "Gravação" },
@@ -20,7 +21,18 @@ const ZakbeatzDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   const [filters, setFilters] = useState({ artist: "all", type: "all", month: "all", year: "all" });
-  const [form, setForm] = useState({ artist: "", type: "pacote_horas", note: "", date: new Date().toISOString().split("T")[0], packageType: "8h" });
+  const [form, setForm] = useState({ 
+    artist: "", 
+    type: "producao_musical", 
+    note: "", 
+    date: new Date().toISOString().split("T")[0], 
+    start: "",
+    pauseStart: "",
+    pauseEnd: "",
+    end: "",
+    totalHours: 0,
+    hourlyRate: 0
+  });
   const [newArtist, setNewArtist] = useState({ name: "" });
   const [showNewForm, setShowNewForm] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -73,6 +85,11 @@ const ZakbeatzDashboard = () => {
   const brl = (v) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const formatDate = (d) => new Date(d).toLocaleDateString("pt-BR");
   const timeToMinutes = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  
+  // Verificar se o tipo usa campos de tempo
+  const usesTimeFields = (type) => {
+    return ['producao_semanal', 'producao_quinzenal', 'parceria_contrapartida'].includes(type);
+  };
 
   // Filtered data
   const filteredSessions = sessions.filter(s => {
@@ -102,18 +119,61 @@ const ZakbeatzDashboard = () => {
 
   // Event handlers
   const addSession = () => {
-    const newSession = form.type === "pacote_horas" ? {
-      date: form.date, artistId: form.artist, type: form.type, note: form.note,
-      packageType: form.packageType, totalHours: parseInt(form.packageType),
-      paidAmount: PACKAGE_VALUES[form.packageType], isPackage: true
-    } : {
-      date: form.date, artistId: form.artist, type: form.type,
-      start: "", pauseStart: "", pauseEnd: "", end: "", totalHours: 0, note: form.note, paidAmount: 0
-    };
+    let newSession;
+    
+    if (usesTimeFields(form.type)) {
+      // Para Produção Semanal, Quinzenal e Parceria - usar campos de tempo
+      let totalHours = 0;
+      if (form.start && form.end) {
+        let totalMinutes = timeToMinutes(form.end) - timeToMinutes(form.start);
+        if (form.pauseStart && form.pauseEnd) {
+          const pauseMinutes = timeToMinutes(form.pauseEnd) - timeToMinutes(form.pauseStart);
+          totalMinutes -= pauseMinutes;
+        }
+        totalHours = Math.max(0, totalMinutes / 60);
+      }
+      
+      newSession = {
+        date: form.date,
+        artistId: form.artist,
+        type: form.type,
+        start: form.start,
+        pauseStart: form.pauseStart,
+        pauseEnd: form.pauseEnd,
+        end: form.end,
+        totalHours: totalHours,
+        note: form.note,
+        paidAmount: 0,
+        isPackage: false
+      };
+    } else {
+      // Para outros tipos - usar quantidade e valor por hora
+      const artist = getArtist(form.artist);
+      const totalValue = (form.totalHours || 0) * (form.hourlyRate || artist?.rate || 50);
+      
+      newSession = {
+        date: form.date,
+        artistId: form.artist,
+        type: form.type,
+        note: form.note,
+        totalHours: form.totalHours || 0,
+        paidAmount: totalValue,
+        isPackage: false
+      };
+    }
     
     database.addSession(newSession);
     setSessions(database.getSessions());
-    setForm(prev => ({ ...prev, note: "" }));
+    setForm(prev => ({ 
+      ...prev, 
+      note: "",
+      start: "",
+      pauseStart: "",
+      pauseEnd: "",
+      end: "",
+      totalHours: 0,
+      hourlyRate: 0
+    }));
   };
 
   const addArtist = () => {
@@ -452,24 +512,68 @@ const ZakbeatzDashboard = () => {
               ))}
             </select>
 
-            {form.type === "pacote_horas" ? (
-              <select 
-                value={form.packageType} 
-                onChange={e => setForm(prev => ({ ...prev, packageType: e.target.value }))}
-                className="border rounded px-3 py-2 text-sm"
-              >
-                {Object.entries(PACKAGE_VALUES).map(([hours, value]) => (
-                  <option key={hours} value={hours}>{hours} - R$ {value}</option>
-                ))}
-              </select>
+            {usesTimeFields(form.type) ? (
+              // Campos de tempo para Produção Semanal, Quinzenal e Parceria
+              <div className="grid grid-cols-4 gap-2">
+                <input 
+                  type="time" 
+                  value={form.start || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, start: e.target.value }))} 
+                  placeholder="Início" 
+                  className="border rounded px-2 py-2 text-sm"
+                />
+                <input 
+                  type="time" 
+                  value={form.pauseStart || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, pauseStart: e.target.value }))} 
+                  placeholder="Pausa" 
+                  className="border rounded px-2 py-2 text-sm"
+                />
+                <input 
+                  type="time" 
+                  value={form.pauseEnd || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, pauseEnd: e.target.value }))} 
+                  placeholder="Reinício" 
+                  className="border rounded px-2 py-2 text-sm"
+                />
+                <input 
+                  type="time" 
+                  value={form.end || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, end: e.target.value }))} 
+                  placeholder="Fim" 
+                  className="border rounded px-2 py-2 text-sm"
+                />
+              </div>
             ) : (
-              <textarea 
-                value={form.note} 
-                onChange={e => setForm(prev => ({ ...prev, note: e.target.value }))} 
-                placeholder="Resumo..." 
-                className="border rounded px-3 py-2 text-sm h-10 resize-none"
-              />
+              // Campos de quantidade e valor para outros tipos
+              <div className="grid grid-cols-2 gap-2">
+                <input 
+                  type="number" 
+                  value={form.totalHours || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, totalHours: parseFloat(e.target.value) || 0 }))} 
+                  placeholder="Qtd. Horas" 
+                  className="border rounded px-3 py-2 text-sm"
+                  step="0.5"
+                  min="0"
+                />
+                <input 
+                  type="number" 
+                  value={form.hourlyRate || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, hourlyRate: parseFloat(e.target.value) || 0 }))} 
+                  placeholder="Valor/Hora" 
+                  className="border rounded px-3 py-2 text-sm"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
             )}
+
+            <textarea 
+              value={form.note} 
+              onChange={e => setForm(prev => ({ ...prev, note: e.target.value }))} 
+              placeholder="Resumo..." 
+              className="border rounded px-3 py-2 text-sm h-10 resize-none"
+            />
 
             <button 
               onClick={addSession} 
@@ -518,10 +622,10 @@ const ZakbeatzDashboard = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Artista</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início/Qtd</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pausa</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reinício</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fim</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fim/Valor</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resumo</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
@@ -531,7 +635,7 @@ const ZakbeatzDashboard = () => {
                 {filteredSessions.map(session => {
                   const artist = getArtist(session.artistId);
                   const style = CLIENT_TYPES[session.type];
-                  const isPackage = session.type === "pacote_horas";
+                  const usesTime = usesTimeFields(session.type);
                   
                   return (
                     <tr key={session.id} className="hover:bg-gray-50">
@@ -547,61 +651,67 @@ const ZakbeatzDashboard = () => {
                       </td>
                       
                       <td className="px-4 py-3">
-                        {isPackage ? (
-                          <div className="bg-purple-50 rounded p-2 text-center">
-                            <span className="text-sm font-medium text-purple-700">
-                              📦 {session.packageType} - {brl(PACKAGE_VALUES[session.packageType])}
-                            </span>
-                          </div>
-                        ) : (
+                        {usesTime ? (
                           <input 
                             type="time" 
                             value={session.start || ""} 
                             onChange={e => updateTime(session.id, "start", e.target.value)} 
                             className="border rounded px-2 py-1 text-sm w-25"
                           />
+                        ) : (
+                          <div className="text-sm text-gray-600">
+                            {(session.totalHours || 0).toFixed(1)}h
+                          </div>
                         )}
                       </td>
                       
                       <td className="px-4 py-3">
-                        {!isPackage && (
+                        {usesTime ? (
                           <input 
                             type="time" 
                             value={session.pauseStart || ""} 
                             onChange={e => updateTime(session.id, "pauseStart", e.target.value)} 
                             className="border rounded px-2 py-1 text-sm w-25"
                           />
+                        ) : (
+                          <div className="text-sm text-gray-600">
+                            —
+                          </div>
                         )}
                       </td>
                       
                       <td className="px-4 py-3">
-                        {!isPackage && (
+                        {usesTime ? (
                           <input 
                             type="time" 
                             value={session.pauseEnd || ""} 
                             onChange={e => updateTime(session.id, "pauseEnd", e.target.value)} 
                             className="border rounded px-2 py-1 text-sm w-25"
                           />
+                        ) : (
+                          <div className="text-sm text-gray-600">
+                            —
+                          </div>
                         )}
                       </td>
                       
                       <td className="px-4 py-3">
-                        {!isPackage && (
+                        {usesTime ? (
                           <input 
                             type="time" 
                             value={session.end || ""} 
                             onChange={e => updateTime(session.id, "end", e.target.value)} 
                             className="border rounded px-2 py-1 text-sm w-25"
                           />
+                        ) : (
+                          <div className="text-sm text-gray-600">
+                            {brl(session.paidAmount || 0)}
+                          </div>
                         )}
                       </td>
                       
                       <td className="px-4 py-3 text-sm font-medium">
-                        {isPackage ? (
-                          <span className="text-purple-600">{session.packageType}</span>
-                        ) : (
-                          <span>{(session.totalHours || 0).toFixed(1)}h</span>
-                        )}
+                        <span>{(session.totalHours || 0).toFixed(1)}h</span>
                       </td>
                       
                       <td className="px-4 py-3 text-sm">

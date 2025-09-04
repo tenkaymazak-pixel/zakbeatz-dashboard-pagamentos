@@ -107,12 +107,13 @@ class Database {
     const artists = [
       { id: "vic", name: "Vic Wendler", rate: 37.5, type: "producao_semanal" },
       { id: "felipe", name: "Felipe Kaziran", rate: 50, type: "mixagem" },
-      { id: "wild", name: "Wild", rate: 50, type: "pacote_horas" },
+      { id: "wild", name: "Wild", rate: 50, type: "producao_musical" },
       { id: "marina", name: "Marina Santos", rate: 45, type: "producao_quinzenal" },
       { id: "carlos", name: "Carlos Beat", rate: 60, type: "masterizacao" },
       { id: "julia", name: "Júlia Vocal", rate: 55, type: "gravacao" },
       { id: "rafael", name: "Rafael Show", rate: 75, type: "montagem_show" },
-      { id: "bruno", name: "Bruno Beats", rate: 40, type: "venda_beat" }
+      { id: "bruno", name: "Bruno Beats", rate: 40, type: "venda_beat" },
+      { id: "parceiro", name: "Parceiro Exemplo", rate: 0, type: "parceria_contrapartida" }
     ];
 
     artists.forEach(artist => {
@@ -125,13 +126,13 @@ class Database {
     // Inserir sessões iniciais
     const sessions = [
       { date: "2025-08-01", artistId: "vic", type: "producao_semanal", start: "09:00", pauseStart: "", pauseEnd: "", end: "13:00", totalHours: 4, note: "Produção", paidAmount: 0 },
-      { date: "2025-08-02", artistId: "felipe", type: "mixagem", start: "14:00", pauseStart: "16:00", pauseEnd: "16:30", end: "18:00", totalHours: 3.5, note: "Mixagem", paidAmount: 200 },
+      { date: "2025-08-02", artistId: "felipe", type: "mixagem", totalHours: 3.5, note: "Mixagem", paidAmount: 175 },
       { date: "2025-08-03", artistId: "marina", type: "producao_quinzenal", start: "10:00", pauseStart: "", pauseEnd: "", end: "14:00", totalHours: 4, note: "Produção Quinzenal", paidAmount: 100 },
-      { date: "2025-08-04", artistId: "carlos", type: "masterizacao", start: "15:00", pauseStart: "", pauseEnd: "", end: "17:00", totalHours: 2, note: "Masterização EP", paidAmount: 0 },
+      { date: "2025-08-04", artistId: "carlos", type: "masterizacao", totalHours: 2, note: "Masterização EP", paidAmount: 120 },
       { date: "2025-08-05", artistId: "julia", type: "gravacao", start: "11:00", pauseStart: "13:00", pauseEnd: "14:00", end: "15:00", totalHours: 3, note: "Gravação Vocal", paidAmount: 220 },
-      { date: "2025-08-06", artistId: "rafael", type: "montagem_show", start: "16:00", pauseStart: "", pauseEnd: "", end: "20:00", totalHours: 4, note: "Montagem Show", paidAmount: 150 },
-      { date: "2025-08-07", artistId: "bruno", type: "venda_beat", start: "13:00", pauseStart: "", pauseEnd: "", end: "16:00", totalHours: 3, note: "Criação Beats", paidAmount: 0 },
-      { date: "2025-08-08", artistId: "wild", type: "pacote_horas", packageType: "8h", totalHours: 8, note: "Pacote 8h", paidAmount: 400, isPackage: 1 }
+      { date: "2025-08-06", artistId: "rafael", type: "montagem_show", totalHours: 4, note: "Montagem Show", paidAmount: 300 },
+      { date: "2025-08-07", artistId: "bruno", type: "venda_beat", totalHours: 3, note: "Criação Beats", paidAmount: 120 },
+      { date: "2025-08-08", artistId: "wild", type: "producao_musical", totalHours: 8, note: "Produção Musical", paidAmount: 400 }
     ];
 
     sessions.forEach(session => {
@@ -142,7 +143,7 @@ class Database {
         [
           session.date, 
           session.artistId, 
-          session.type || 'pacote_horas',
+          session.type || 'producao_musical',
           session.start || null, 
           session.pauseStart || null, 
           session.pauseEnd || null, 
