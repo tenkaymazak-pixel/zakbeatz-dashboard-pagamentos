@@ -67,12 +67,16 @@ class Database {
         paidAmount REAL DEFAULT 0,
         packageType TEXT,
         isPackage INTEGER DEFAULT 0,
+        hourlyRate REAL DEFAULT 0,
         FOREIGN KEY (artistId) REFERENCES artists (id)
       )
     `);
 
     // Migração: adicionar coluna type se não existir
     this.migrateAddTypeColumn();
+    
+    // Migração: adicionar coluna hourlyRate se não existir
+    this.migrateAddHourlyRateColumn();
   }
 
   migrateAddTypeColumn() {
@@ -99,6 +103,33 @@ class Database {
       }
     } catch (error) {
       console.error('Erro na migração:', error);
+    }
+  }
+
+  migrateAddHourlyRateColumn() {
+    try {
+      // Verificar se a coluna hourlyRate já existe
+      const result = this.db.exec("PRAGMA table_info(sessions)");
+      const columns = result[0]?.values || [];
+      const hasHourlyRateColumn = columns.some(col => col[1] === 'hourlyRate');
+      
+      console.log('Colunas da tabela sessions:', columns.map(col => col[1]));
+      
+      if (!hasHourlyRateColumn) {
+        console.log('Adicionando coluna hourlyRate à tabela sessions...');
+        this.db.exec("ALTER TABLE sessions ADD COLUMN hourlyRate REAL DEFAULT 0");
+        this.save();
+        console.log('Coluna hourlyRate adicionada com sucesso!');
+        
+        // Atualizar sessões existentes com valor padrão
+        this.db.exec("UPDATE sessions SET hourlyRate = 0 WHERE hourlyRate IS NULL");
+        this.save();
+        console.log('Sessões existentes atualizadas com hourlyRate padrão!');
+      } else {
+        console.log('Coluna hourlyRate já existe na tabela sessions');
+      }
+    } catch (error) {
+      console.error('Erro na migração hourlyRate:', error);
     }
   }
 
@@ -225,8 +256,8 @@ class Database {
 
     this.db.run(
       `INSERT INTO sessions 
-       (date, artistId, type, start, pauseStart, pauseEnd, end, totalHours, note, paidAmount, packageType, isPackage) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (date, artistId, type, start, pauseStart, pauseEnd, end, totalHours, note, paidAmount, packageType, isPackage, hourlyRate) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         session.date, 
         session.artistId, 
@@ -239,7 +270,8 @@ class Database {
         session.note || null, 
         session.paidAmount || 0, 
         session.packageType || null, 
-        session.isPackage ? 1 : 0
+        session.isPackage ? 1 : 0,
+        session.hourlyRate || 0
       ]
     );
     this.save();

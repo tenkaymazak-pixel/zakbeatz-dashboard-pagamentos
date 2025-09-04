@@ -39,6 +39,10 @@ const ZakbeatzDashboard = () => {
   const [newArtist, setNewArtist] = useState({ name: "" });
   const [showNewForm, setShowNewForm] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
+  const [selectedArtist, setSelectedArtist] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
 
   // Carregar dados do banco
   useEffect(() => {
@@ -89,6 +93,35 @@ const ZakbeatzDashboard = () => {
   const formatDate = (d) => new Date(d).toLocaleDateString("pt-BR");
   const timeToMinutes = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
   
+  // Funções para gerenciar pagamentos
+  const addPayment = (artistId, amount) => {
+    const payments = JSON.parse(localStorage.getItem(`payments_${artistId}`) || '[]');
+    const newPayment = {
+      id: Date.now(),
+      amount: parseFloat(amount),
+      date: new Date().toISOString(),
+      artistId
+    };
+    payments.push(newPayment);
+    localStorage.setItem(`payments_${artistId}`, JSON.stringify(payments));
+    
+    // Atualizar o estado para refletir a mudança
+    setSessions(prev => [...prev]);
+  };
+  
+  const getPayments = (artistId) => {
+    return JSON.parse(localStorage.getItem(`payments_${artistId}`) || '[]');
+  };
+  
+  const removePayment = (artistId, paymentId) => {
+    const payments = getPayments(artistId);
+    const updatedPayments = payments.filter(p => p.id !== paymentId);
+    localStorage.setItem(`payments_${artistId}`, JSON.stringify(updatedPayments));
+    
+    // Atualizar o estado para refletir a mudança
+    setSessions(prev => [...prev]);
+  };
+  
   // Verificar se o tipo usa campos de tempo
   const usesTimeFields = (type) => {
     return ['producao_semanal', 'producao_quinzenal', 'parceria_contrapartida'].includes(type);
@@ -114,9 +147,15 @@ const ZakbeatzDashboard = () => {
   });
 
   const hoursByArtist = filteredSessions.reduce((acc, s) => {
-    acc[s.artistId] = acc[s.artistId] || { hours: 0, paid: 0 };
+    acc[s.artistId] = acc[s.artistId] || { hours: 0, total: 0, paid: 0 };
     acc[s.artistId].hours += s.totalHours || 0;
-    acc[s.artistId].paid += s.paidAmount || 0;
+    acc[s.artistId].total += s.paidAmount || 0; // Valor total das sessões
+    
+    // Calcular valor pago baseado nos pagamentos registrados
+    const payments = getPayments(s.artistId);
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+    acc[s.artistId].paid = totalPaid;
+    
     return acc;
   }, {});
 
@@ -144,6 +183,9 @@ const ZakbeatzDashboard = () => {
         totalHours = Math.max(0, totalMinutes / 60);
       }
       
+      // Calcular o valor total baseado no valor por hora e horas trabalhadas
+      const totalValue = totalHours * (form.hourlyRate || 0);
+      
       newSession = {
         date: form.date,
         artistId: form.artist,
@@ -154,13 +196,14 @@ const ZakbeatzDashboard = () => {
         end: form.end,
         totalHours: totalHours,
         note: form.note,
-        paidAmount: 0,
-        isPackage: false
+        paidAmount: totalValue,
+        isPackage: false,
+        hourlyRate: form.hourlyRate || 0
       };
     } else {
       // Para outros tipos - usar quantidade e valor por hora
       const artist = getArtist(form.artist);
-      const totalValue = (form.totalHours || 0) * (form.hourlyRate || artist?.rate || 50);
+      const totalValue = (form.totalHours || 0) * (form.hourlyRate || 0);
       
       newSession = {
         date: form.date,
@@ -169,7 +212,8 @@ const ZakbeatzDashboard = () => {
         note: form.note,
         totalHours: form.totalHours || 0,
         paidAmount: totalValue,
-        isPackage: false
+        isPackage: false,
+        hourlyRate: form.hourlyRate || 0
       };
     }
     
@@ -251,48 +295,21 @@ const ZakbeatzDashboard = () => {
     }
   };
 
-  const ClientCard = ({ artist, hours, paid }) => {
-    const total = hours * artist.rate;
-    const remaining = total - paid;
+  const ClientCard = ({ artist, hours, paid, total }) => {
+    const remaining = total - paid; // Valor restante
     const style = CLIENT_TYPES[artist.type];
 
     return (
       <div className="bg-white rounded-lg p-4 border shadow-sm">
         <div className="flex justify-between items-center mb-3">
           <span className="font-semibold text-sm">{artist.name}</span>
-          <div className="flex gap-2">
-            <div className="relative">
-              <input 
-                type={showValues ? "number" : "text"}
-                step="0.5" 
-                value={showValues ? artist.rate : maskValue(artist.rate)}
-                onChange={(e) => {
-                  if (showValues) {
-                    database.updateArtist(artist.id, { rate: Number(e.target.value) });
-                    setArtists(database.getArtists());
-                  }
-                }}
-                className="text-xs bg-blue-100 px-2 py-1 rounded-full text-blue-700 border-0 w-16 text-center"
-                title="Valor por hora"
-                disabled={!showValues}
-              />
-              <button 
-                type="button"
-                onClick={() => setShowValues(!showValues)}
-                className="absolute -right-1 -top-1 text-xs text-gray-500 hover:text-gray-700"
-                title={showValues ? "Ocultar" : "Mostrar"}
-              >
-                {showValues ? "👁️" : "👁️‍🗨️"}
-              </button>
-            </div>
-            <button 
-              onClick={() => removeArtist(artist.id)}
-              className="text-red-500 hover:bg-red-50 rounded px-1 text-xs"
-              title="Remover artista"
-            >
-              ✕
-            </button>
-          </div>
+          <button 
+            onClick={() => removeArtist(artist.id)}
+            className="text-red-500 hover:bg-red-50 rounded px-1 text-xs"
+            title="Remover artista"
+          >
+            ✕
+          </button>
         </div>
         
         <div className="grid grid-cols-2 gap-3 mb-3">
@@ -307,26 +324,25 @@ const ZakbeatzDashboard = () => {
         </div>
         
         <div className="space-y-2">
-          <div className="relative">
-            <input 
-              type="text" 
-              value={showValues ? brl(paid) : maskValue(brl(paid))}
-              onChange={(e) => {
-                if (showValues) {
-                  updatePaid(artist.id, e.target.value);
-                }
-              }}
-              className="w-full border rounded px-3 py-2 text-sm text-center"
-              placeholder="Valor Pago"
-              disabled={!showValues}
-            />
+          <div className="grid grid-cols-2 gap-2">
             <button 
-              type="button"
-              onClick={() => setShowValues(!showValues)}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-              title={showValues ? "Ocultar" : "Mostrar"}
+              onClick={() => {
+                setSelectedArtist(artist);
+                setPaymentAmount("");
+                setShowPaymentModal(true);
+              }}
+              className="bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600 transition-colors"
             >
-              {showValues ? "👁️" : "👁️‍🗨️"}
+              💰 Lançar Pagamento
+            </button>
+            <button 
+              onClick={() => {
+                setSelectedArtist(artist);
+                setShowPaymentHistoryModal(true);
+              }}
+              className="bg-gray-500 text-white px-3 py-2 rounded text-sm hover:bg-gray-600 transition-colors"
+            >
+              📋 Ver Pagamentos
             </button>
           </div>
           {remaining > 0 ? (
@@ -484,11 +500,26 @@ const ZakbeatzDashboard = () => {
           </select>
         </div>
 
-        {/* Total */}
-        <div className="mb-6 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg p-4 text-center">
-          <div className="text-sm font-medium mb-1">Total Recebido</div>
-          <div className="text-2xl font-bold">
-            {showValues ? brl(visibleArtists.reduce((total, artist) => total + (hoursByArtist[artist.id]?.paid || 0), 0)) : maskValue(brl(visibleArtists.reduce((total, artist) => total + (hoursByArtist[artist.id]?.paid || 0), 0)))}
+        {/* Totais */}
+        <div className="mb-6 space-y-3">
+          <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg p-4 text-center">
+            <div className="text-sm font-medium mb-1">Total Recebido</div>
+            <div className="text-2xl font-bold">
+              {showValues ? brl(visibleArtists.reduce((total, artist) => total + (hoursByArtist[artist.id]?.paid || 0), 0)) : maskValue(brl(visibleArtists.reduce((total, artist) => total + (hoursByArtist[artist.id]?.paid || 0), 0)))}
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg p-4 text-center">
+            <div className="text-sm font-medium mb-1">Total a Receber</div>
+            <div className="text-2xl font-bold">
+              {showValues ? brl(visibleArtists.reduce((total, artist) => {
+                const artistData = hoursByArtist[artist.id];
+                return total + (artistData?.total || 0) - (artistData?.paid || 0);
+              }, 0)) : maskValue(brl(visibleArtists.reduce((total, artist) => {
+                const artistData = hoursByArtist[artist.id];
+                return total + (artistData?.total || 0) - (artistData?.paid || 0);
+              }, 0)))}
+            </div>
           </div>
         </div>
 
@@ -504,6 +535,7 @@ const ZakbeatzDashboard = () => {
                 artist={artist}
                 hours={hoursByArtist[artist.id].hours}
                 paid={hoursByArtist[artist.id].paid}
+                total={hoursByArtist[artist.id].total}
               />
             ))}
           </div>
@@ -561,37 +593,16 @@ const ZakbeatzDashboard = () => {
             </select>
 
             {usesTimeFields(form.type) ? (
-              // Campos de tempo para Produção Semanal, Quinzenal e Parceria
-              <div className="grid grid-cols-4 gap-2">
-                <input 
-                  type="time" 
-                  value={form.start || ""} 
-                  onChange={e => setForm(prev => ({ ...prev, start: e.target.value }))} 
-                  placeholder="Início" 
-                  className="border rounded px-2 py-2 text-sm"
-                />
-                <input 
-                  type="time" 
-                  value={form.pauseStart || ""} 
-                  onChange={e => setForm(prev => ({ ...prev, pauseStart: e.target.value }))} 
-                  placeholder="Pausa" 
-                  className="border rounded px-2 py-2 text-sm"
-                />
-                <input 
-                  type="time" 
-                  value={form.pauseEnd || ""} 
-                  onChange={e => setForm(prev => ({ ...prev, pauseEnd: e.target.value }))} 
-                  placeholder="Reinício" 
-                  className="border rounded px-2 py-2 text-sm"
-                />
-                <input 
-                  type="time" 
-                  value={form.end || ""} 
-                  onChange={e => setForm(prev => ({ ...prev, end: e.target.value }))} 
-                  placeholder="Fim" 
-                  className="border rounded px-2 py-2 text-sm"
-                />
-              </div>
+              // Campo de valor para Produção Semanal, Quinzenal e Parceria
+              <input 
+                type="number" 
+                value={form.hourlyRate || ""} 
+                onChange={e => setForm(prev => ({ ...prev, hourlyRate: parseFloat(e.target.value) || 0 }))} 
+                placeholder="Valor/Hora" 
+                className="border rounded px-3 py-2 text-sm"
+                step="0.01"
+                min="0"
+              />
             ) : (
               // Campos de quantidade e valor para outros tipos
               <div className="grid grid-cols-2 gap-2">
@@ -615,17 +626,57 @@ const ZakbeatzDashboard = () => {
                 />
               </div>
             )}
+          </div>
 
+
+
+          {/* Terceira linha - resumo e campos de horário */}
+          <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-end mb-4 mt-4">
             <textarea 
               value={form.note} 
               onChange={e => setForm(prev => ({ ...prev, note: e.target.value }))} 
               placeholder="Resumo..." 
-              className="border rounded px-3 py-2 text-sm h-10 resize-none"
+              className="border rounded px-3 py-2 text-sm h-10 resize-none lg:col-span-2"
             />
+            {usesTimeFields(form.type) && (
+              <>
+                <input 
+                  type="time" 
+                  value={form.start || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, start: e.target.value }))} 
+                  placeholder="Início" 
+                  className="border rounded px-3 py-2 text-sm"
+                />
+                <input 
+                  type="time" 
+                  value={form.pauseStart || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, pauseStart: e.target.value }))} 
+                  placeholder="Pausa" 
+                  className="border rounded px-3 py-2 text-sm"
+                />
+                <input 
+                  type="time" 
+                  value={form.pauseEnd || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, pauseEnd: e.target.value }))} 
+                  placeholder="Reinício" 
+                  className="border rounded px-3 py-2 text-sm"
+                />
+                <input 
+                  type="time" 
+                  value={form.end || ""} 
+                  onChange={e => setForm(prev => ({ ...prev, end: e.target.value }))} 
+                  placeholder="Fim" 
+                  className="border rounded px-3 py-2 text-sm"
+                />
+              </>
+            )}
+          </div>
 
+          {/* Botão Adicionar */}
+          <div className="flex justify-center">
             <button 
               onClick={addSession} 
-              className="px-4 py-2 bg-black text-white rounded text-sm hover:bg-gray-800"
+              className="px-6 py-3 bg-black text-white rounded text-sm hover:bg-gray-800"
             >
               Adicionar
             </button>
@@ -785,6 +836,129 @@ const ZakbeatzDashboard = () => {
           </div>
         </div>
       </div>
+      
+      {/* Modal de Lançar Pagamento */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-bold mb-4">
+              Lançar Pagamento - {selectedArtist?.name}
+            </h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Valor do Pagamento
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                className="w-full border rounded px-3 py-2"
+                placeholder="0,00"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (paymentAmount && parseFloat(paymentAmount) > 0) {
+                    addPayment(selectedArtist.id, paymentAmount);
+                    setShowPaymentModal(false);
+                    setPaymentAmount("");
+                    setSelectedArtist(null);
+                  }
+                }}
+                className="flex-1 bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+              >
+                Lançar Pagamento
+              </button>
+              <button
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setPaymentAmount("");
+                  setSelectedArtist(null);
+                }}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal de Histórico de Pagamentos */}
+      {showPaymentHistoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-h-96 overflow-y-auto">
+            <h3 className="text-lg font-bold mb-4">
+              Histórico de Pagamentos - {selectedArtist?.name}
+            </h3>
+            {(() => {
+              const payments = getPayments(selectedArtist?.id);
+              const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+              const artistData = hoursByArtist[selectedArtist?.id];
+              const remaining = (artistData?.total || 0) - totalPaid;
+              
+              return (
+                <div>
+                  <div className="mb-4 p-3 bg-gray-50 rounded">
+                    <div className="text-sm">
+                      <div className="flex justify-between mb-1">
+                        <span>Total das sessões:</span>
+                        <span className="font-medium">{showValues ? brl(artistData?.total || 0) : maskValue(brl(artistData?.total || 0))}</span>
+                      </div>
+                      <div className="flex justify-between mb-1">
+                        <span>Total pago:</span>
+                        <span className="font-medium text-green-600">{showValues ? brl(totalPaid) : maskValue(brl(totalPaid))}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Restante:</span>
+                        <span className={`font-medium ${remaining > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {showValues ? brl(remaining) : maskValue(brl(remaining))}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {payments.length > 0 ? (
+                    <div className="space-y-2">
+                      {payments.map(payment => (
+                        <div key={payment.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <div>
+                            <div className="text-sm font-medium">{brl(payment.amount)}</div>
+                            <div className="text-xs text-gray-500">{formatDate(payment.date)}</div>
+                          </div>
+                          <button
+                            onClick={() => removePayment(selectedArtist.id, payment.id)}
+                            className="text-red-500 hover:bg-red-50 rounded px-2 py-1 text-xs"
+                            title="Remover pagamento"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-500 py-4">
+                      Nenhum pagamento registrado
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={() => {
+                      setShowPaymentHistoryModal(false);
+                      setSelectedArtist(null);
+                    }}
+                    className="w-full mt-4 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
