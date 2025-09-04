@@ -1,4 +1,4 @@
-# ZAKBEATZ OS - Dashboard
+# DASHBOARD DE PAGAMENTOS
 
 Dashboard para controle de sessões, artistas e pagamentos do estúdio Zakbeatz.
 

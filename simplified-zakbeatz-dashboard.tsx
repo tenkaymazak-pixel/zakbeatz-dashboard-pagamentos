@@ -33,6 +33,9 @@ const ZakbeatzDashboard = () => {
     totalHours: 0,
     hourlyRate: 0
   });
+  
+  // Estado para controlar visibilidade dos valores
+  const [showValues, setShowValues] = useState(false);
   const [newArtist, setNewArtist] = useState({ name: "" });
   const [showNewForm, setShowNewForm] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -89,6 +92,14 @@ const ZakbeatzDashboard = () => {
   // Verificar se o tipo usa campos de tempo
   const usesTimeFields = (type) => {
     return ['producao_semanal', 'producao_quinzenal', 'parceria_contrapartida'].includes(type);
+  };
+  
+  // Função para mascarar valores
+  const maskValue = (value) => {
+    if (!showValues) {
+      return '••••••';
+    }
+    return value;
   };
 
   // Filtered data
@@ -250,17 +261,30 @@ const ZakbeatzDashboard = () => {
         <div className="flex justify-between items-center mb-3">
           <span className="font-semibold text-sm">{artist.name}</span>
           <div className="flex gap-2">
-            <input 
-              type="number" 
-              step="0.5" 
-              value={artist.rate} 
-              onChange={(e) => {
-                database.updateArtist(artist.id, { rate: Number(e.target.value) });
-                setArtists(database.getArtists());
-              }}
-              className="text-xs bg-blue-100 px-2 py-1 rounded-full text-blue-700 border-0 w-16 text-center"
-              title="Valor por hora"
-            />
+            <div className="relative">
+              <input 
+                type={showValues ? "number" : "text"}
+                step="0.5" 
+                value={showValues ? artist.rate : maskValue(artist.rate)}
+                onChange={(e) => {
+                  if (showValues) {
+                    database.updateArtist(artist.id, { rate: Number(e.target.value) });
+                    setArtists(database.getArtists());
+                  }
+                }}
+                className="text-xs bg-blue-100 px-2 py-1 rounded-full text-blue-700 border-0 w-16 text-center"
+                title="Valor por hora"
+                disabled={!showValues}
+              />
+              <button 
+                type="button"
+                onClick={() => setShowValues(!showValues)}
+                className="absolute -right-1 -top-1 text-xs text-gray-500 hover:text-gray-700"
+                title={showValues ? "Ocultar" : "Mostrar"}
+              >
+                {showValues ? "👁️" : "👁️‍🗨️"}
+              </button>
+            </div>
             <button 
               onClick={() => removeArtist(artist.id)}
               className="text-red-500 hover:bg-red-50 rounded px-1 text-xs"
@@ -277,22 +301,37 @@ const ZakbeatzDashboard = () => {
             <div className="text-xs text-gray-500">Trabalhadas</div>
           </div>
           <div className="text-center bg-gray-50 rounded p-2">
-            <div className="font-bold text-lg text-green-600">{brl(total)}</div>
+            <div className="font-bold text-lg text-green-600">{showValues ? brl(total) : maskValue(brl(total))}</div>
             <div className="text-xs text-gray-500">Total</div>
           </div>
         </div>
         
         <div className="space-y-2">
-          <input 
-            type="text" 
-            value={brl(paid)}
-            onChange={(e) => updatePaid(artist.id, e.target.value)} 
-            className="w-full border rounded px-3 py-2 text-sm text-center"
-            placeholder="Valor Pago"
-          />
+          <div className="relative">
+            <input 
+              type="text" 
+              value={showValues ? brl(paid) : maskValue(brl(paid))}
+              onChange={(e) => {
+                if (showValues) {
+                  updatePaid(artist.id, e.target.value);
+                }
+              }}
+              className="w-full border rounded px-3 py-2 text-sm text-center"
+              placeholder="Valor Pago"
+              disabled={!showValues}
+            />
+            <button 
+              type="button"
+              onClick={() => setShowValues(!showValues)}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              title={showValues ? "Ocultar" : "Mostrar"}
+            >
+              {showValues ? "👁️" : "👁️‍🗨️"}
+            </button>
+          </div>
           {remaining > 0 ? (
             <div className="text-xs text-red-600 text-center bg-red-50 rounded px-2 py-1">
-              Restante: {brl(remaining)}
+              Restante: {showValues ? brl(remaining) : maskValue(brl(remaining))}
             </div>
           ) : total > 0 && (
             <div className="text-xs text-green-600 text-center bg-green-50 rounded px-2 py-1">
@@ -319,7 +358,7 @@ const ZakbeatzDashboard = () => {
     <div className="min-h-screen bg-white flex flex-col lg:flex-row">
       {/* Mobile Header */}
       <div className="lg:hidden bg-gray-50 border-b p-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold">ZAKBEATZ OS</h1>
+        <h1 className="text-xl font-bold">DASHBOARD DE PAGAMENTOS</h1>
         <button 
           onClick={() => setShowSidebar(!showSidebar)}
           className="p-2 bg-blue-500 text-white rounded"
@@ -333,15 +372,24 @@ const ZakbeatzDashboard = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div>
-              <h1 className="text-2xl font-bold mb-1">ZAKBEATZ OS</h1>
+              <h1 className="text-2xl font-bold mb-1">DASHBOARD DE PAGAMENTOS</h1>
               <p className="text-sm text-gray-600">Sessions • Artistas • Pagamentos</p>
             </div>
-            <button 
-              onClick={() => setShowSidebar(false)}
-              className="lg:hidden p-2 text-gray-500 hover:bg-gray-200 rounded"
-            >
-              ✕
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setShowValues(!showValues)}
+                className="p-2 text-gray-500 hover:bg-gray-200 rounded"
+                title={showValues ? "Ocultar valores" : "Mostrar valores"}
+              >
+                {showValues ? "👁️" : "👁️‍🗨️"}
+              </button>
+              <button 
+                onClick={() => setShowSidebar(false)}
+                className="lg:hidden p-2 text-gray-500 hover:bg-gray-200 rounded"
+              >
+                ✕
+              </button>
+            </div>
           </div>
           
           {/* Botões de banco de dados */}
@@ -440,7 +488,7 @@ const ZakbeatzDashboard = () => {
         <div className="mb-6 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg p-4 text-center">
           <div className="text-sm font-medium mb-1">Total Recebido</div>
           <div className="text-2xl font-bold">
-            {brl(visibleArtists.reduce((total, artist) => total + (hoursByArtist[artist.id]?.paid || 0), 0))}
+            {showValues ? brl(visibleArtists.reduce((total, artist) => total + (hoursByArtist[artist.id]?.paid || 0), 0)) : maskValue(brl(visibleArtists.reduce((total, artist) => total + (hoursByArtist[artist.id]?.paid || 0), 0)))}
           </div>
         </div>
 
@@ -705,7 +753,7 @@ const ZakbeatzDashboard = () => {
                           />
                         ) : (
                           <div className="text-sm text-gray-600">
-                            {brl(session.paidAmount || 0)}
+                            {showValues ? brl(session.paidAmount || 0) : maskValue(brl(session.paidAmount || 0))}
                           </div>
                         )}
                       </td>
