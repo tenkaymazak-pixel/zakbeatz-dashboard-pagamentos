@@ -149,7 +149,12 @@ const ZakbeatzDashboard = () => {
   const hoursByArtist = filteredSessions.reduce((acc, s) => {
     acc[s.artistId] = acc[s.artistId] || { hours: 0, total: 0, paid: 0 };
     acc[s.artistId].hours += s.totalHours || 0;
-    acc[s.artistId].total += s.paidAmount || 0; // Valor total das sessões
+    
+    // Calcular valor total baseado nas horas e taxa horária do artista
+    const artist = artists.find(a => a.id === s.artistId);
+    if (artist && artist.rate > 0) {
+      acc[s.artistId].total += (s.totalHours || 0) * artist.rate;
+    }
     
     // Calcular valor pago baseado nos pagamentos registrados
     const payments = getPayments(s.artistId);
@@ -263,6 +268,12 @@ const ZakbeatzDashboard = () => {
       }
       
       updated.totalHours = Math.max(0, totalMinutes / 60);
+      
+      // Atualizar taxa horária baseada no artista atual
+      const artist = artists.find(a => a.id === session.artistId);
+      if (artist && artist.rate > 0) {
+        updated.hourlyRate = artist.rate;
+      }
     }
     
     database.updateSession(id, updated);
